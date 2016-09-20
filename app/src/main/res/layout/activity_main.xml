@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.kirito.simplemp3player.MainActivity">
+
+    <ListView
+        android:id="@+id/lv"
+        android:layout_width="match_parent"
+        android:divider="@null"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        />
+
+    <RelativeLayout
+        android:layout_margin="4dp"
+        android:background="#e6e0e0"
+        android:layout_width="match_parent"
+        android:layout_height="90dp">
+
+        <ImageButton
+            android:id="@+id/ib_last"
+            android:src="@drawable/last"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/ib_play"
+            android:src="@drawable/play"
+            android:layout_toRightOf="@id/ib_last"
+            android:layout_width="wrap_content"
+            android:layout_marginLeft="60dp"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/ib_next"
+            android:src="@drawable/next"
+            android:layout_toRightOf="@id/ib_play"
+            android:layout_width="wrap_content"
+            android:layout_marginLeft="70dp"
+            android:layout_height="wrap_content" />
+
+        <ProgressBar
+            android:id="@+id/pb"
+            android:scrollbars="horizontal"
+            android:layout_below="@id/ib_last"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </RelativeLayout>
+</LinearLayout>
