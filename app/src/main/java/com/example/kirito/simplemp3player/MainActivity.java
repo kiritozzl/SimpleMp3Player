@@ -1,6 +1,7 @@
 package com.example.kirito.simplemp3player;
 
 import android.content.DialogInterface;
+import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.Image;
 import android.media.MediaPlayer;
@@ -14,6 +15,8 @@ import android.widget.AdapterView;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.SeekBar;
+import android.widget.TextView;
 
 import com.example.kirito.simplemp3player.adapter.ListAdapter;
 import com.example.kirito.simplemp3player.entity.Mp3Item;
@@ -23,12 +26,17 @@ import com.example.kirito.simplemp3player.support.OpenMp3File;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Handler;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
     private ImageButton ib_last;
     private ImageButton ib_play;
     private ImageButton ib_next;
-    private ProgressBar pb;
+    private SeekBar sb;
     private ListView lv;
 
     private String path;
@@ -39,6 +47,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String ph;
     private boolean isPlay = false;
     private int last,next,now;
+    private android.os.Handler mHandler = new android.os.Handler();
+    private String music_title;
+
+    @BindView(R.id.tv_total)
+    TextView tv_total;
+    @BindView(R.id.tv_current)
+    TextView tv_current;
 
     private static final String TAG = "MainActivity";
 
@@ -46,7 +61,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        ButterKnife.bind(this);
         setView();
         //path = Environment.getExternalStorageDirectory().getAbsolutePath();
         //Log.e(TAG, "onCreate: external path ---"+ Environment.getExternalStorageDirectory().getAbsolutePath());
@@ -73,7 +88,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 next = position + 1;
                                 Mp3Item item = (Mp3Item) parent.getItemAtPosition(position);
                                 ph = item.getPath();
-                                playMp3(ph);
+                                music_title = item.getName();
+                                if (player != null){
+                                    stopPlayer();
+                                }
+                                playMp3(ph,music_title);
 
                                 if (isPlay){
                                     ib_play.setImageResource(R.drawable.stop);
@@ -87,13 +106,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         load.execute(path);
     }
 
-    private void playMp3(String path){
+    private void playMp3(String path,String m_name){
         player = new MediaPlayer();
         player.setAudioStreamType(AudioManager.STREAM_MUSIC);
         try {
             player.setDataSource(MainActivity.this, Uri.parse(path));
             player.prepare();
             player.start();
+            setMusicTitle(m_name);
+            updateSeekBar();
             isPlay = true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -101,9 +122,46 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mp) {
-                ib_play.setImageResource(R.drawable.play);
+                //ib_play.setImageResource(R.drawable.play);
+
+                playNext();
             }
         });
+    }
+
+    private void setMusicTitle(String s){
+        setTitle(s);
+    }
+
+    private void updateSeekBar(){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (player != null){
+                    int mCurrentPosition = player.getCurrentPosition() / 1000;
+                    int total = player.getDuration() / 1000;
+                    sb.setProgress(mCurrentPosition);
+                    sb.setMax(total);
+                    tv_total.setText(calculateTime(total));
+                    tv_current.setText(calculateTime(mCurrentPosition));
+                }
+                mHandler.postDelayed(this,1000);
+            }
+        });
+    }
+
+    private String calculateTime(int time){
+        int minute;
+        int second;
+        if (time >= 60){
+            minute = time / 60;
+            second = time % 60;
+            return minute + ":" +second;
+        }else if (time < 60){
+            second = time;
+            return "0:" + second;
+        }
+        return null;
     }
 
     private void setView(){
@@ -113,14 +171,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         ib_play.setOnClickListener(this);
         ib_last.setOnClickListener(this);
         ib_next.setOnClickListener(this);
-        pb = (ProgressBar) findViewById(R.id.pb);
+        sb = (SeekBar) findViewById(R.id.sb);
         lv = (ListView) findViewById(R.id.lv);
+
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (player != null && fromUser){
+                    player.seekTo(progress * 1000);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
     }
 
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.ib_play){
-            if (!isPlay && path != null){
+            if (!isPlay && path != null && player!= null){
                 player.start();
                 isPlay = true;
                 ib_play.setImageResource(R.drawable.stop);
@@ -130,23 +207,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 ib_play.setImageResource(R.drawable.play);
             }
         }else if (v.getId() == R.id.ib_last){
-            if (last >= 0){
-                stopPlayer();
-                Mp3Item last_item = items.get(last);
-                playMp3(last_item.getPath());
-                now = last;
-                last = now - 1;
-                next = now + 1;
-            }
+            playLast();
         }else if (v.getId() == R.id.ib_next){
-            if (next <= items.size()){
-                stopPlayer();
-                Mp3Item next_item = items.get(next);
-                playMp3(next_item.getPath());
-                now = next;
-                last = now - 1;
-                next = now + 1;
-            }
+            playNext();
+        }
+    }
+
+    private void playNext(){
+        if (next <= items.size()){
+            stopPlayer();
+            Mp3Item next_item = items.get(next);
+            playMp3(next_item.getPath(),next_item.getName());
+            now = next;
+            last = now - 1;
+            next = now + 1;
+        }
+    }
+
+    private void playLast(){
+        if (last >= 0){
+            stopPlayer();
+            Mp3Item last_item = items.get(last);
+            playMp3(last_item.getPath(),last_item.getName());
+            now = last;
+            last = now - 1;
+            next = now + 1;
         }
     }
 
